@@ -1,6 +1,6 @@
 # order.py
 
-Find the top 10 words in a text document using fuzzy matching.
+Find the top 10 uncommon words in a text document using fuzzy matching.
 
 ## License
 
