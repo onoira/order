@@ -3,11 +3,13 @@ import os
 import sys
 import re
 import time
+import pickle
 from difflib import get_close_matches
 from pprint import pprint
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, IO, TypeVar
 
 TOP_COUNT = 10
+_PICKLE = 'blacklist.pickle'
 _RET = TypeVar('_RET')
 
 
@@ -29,15 +31,40 @@ def timed(f: Callable[..., _RET]) -> Callable[..., _RET]:
 @timed
 def get_blacklist() -> set[str]:
 
-    blacklist = list[str]()
+    def new() -> set[str]:
 
-    with open('words/1-1000.txt', 'r') as fp:
-        blacklist += fp.readlines()
+        blacklist = list[str]()
 
-    with open('blacklist.txt', 'r') as fp:
-        blacklist += fp.readlines()
+        with open('words/1-1000.txt', 'r') as fp:
+            blacklist += fp.readlines()
 
-    return set(blacklist)
+        with open('blacklist.txt', 'r') as fp:
+            blacklist += fp.readlines()
+
+        r = set(blacklist)
+
+        jar: IO[bytes]
+        with open(_PICKLE, 'wb') as jar:
+            pickle.dump(r, jar)
+
+        return r
+
+    def load() -> set[str]:
+
+        r: set[str]
+
+        with open(_PICKLE, 'rb') as jar:
+            r = pickle.load(jar)
+
+        return r
+
+    f: Callable[[], set[str]]
+    if os.path.exists(_PICKLE):
+        f = load
+    else:
+        f = new
+
+    return f()
 
 
 @timed
