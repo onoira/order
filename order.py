@@ -1,10 +1,32 @@
 #!/usr/bin/env python3
+import os
 import sys
 import re
+import time
 from difflib import get_close_matches
 from pprint import pprint
+from typing import Any, Callable, TypeVar
+
+TOP_COUNT = 10
+_RET = TypeVar('_RET')
 
 
+def timed(f: Callable[..., _RET]) -> Callable[..., _RET]:
+
+    def inner(*args: Any) -> Any:
+
+        tfrom = time.time()
+        retval = f(*args)
+        ttill = time.time()
+
+        print(f'({(ttill - tfrom)*1000.0:.2f}ms)')
+
+        return retval
+
+    return inner
+
+
+@timed
 def get_blacklist() -> set[str]:
 
     blacklist = list[str]()
@@ -18,23 +40,24 @@ def get_blacklist() -> set[str]:
     return set(blacklist)
 
 
-def main() -> None:
+@timed
+def read_file(filename: str) -> str:
+    with open(filename, 'r') as fp:
+        return fp.read()
 
-    if len(sys.argv) < 2:
-        print('usage: order [filename]')
-        sys.exit(1)
 
-    text: str
-    with open(sys.argv[1], 'r') as fp:
-        text = fp.read()
+@timed
+def get_order(text: str) -> list[str]:
+    return re.findall(r'\b[A-Za-z0-9]+\b', text)
 
-    order: list[str] = re.findall(r'\b[A-Za-z0-9]+\b', text)
-    blacklist = get_blacklist()
+
+@timed
+def get_ord_frequency(order: list[str], blacklist: set[str]) -> dict[str, int]:
 
     freq = dict[str, int]()
     for idx, ord in enumerate(order):
 
-        print(f'Reading ord {idx} / {len(order)}', end='\r')
+        print(f'{idx} / {len(order)}', end='\r')
 
         if len(ord) == 1:
             continue
@@ -50,11 +73,45 @@ def main() -> None:
         freq[k_match] = freq.get(k_match, 0) + 1
 
     print()
-    pprint(sorted(freq, key=freq.__getitem__, reverse=True)[:10])
+    return freq
+
+
+@timed
+def get_freq_top(freq: dict[str, int]) -> list[tuple[str, int]]:
+    return [
+        (k, freq[k])
+        for k in sorted(freq, key=freq.__getitem__, reverse=True)[:TOP_COUNT]
+    ]
+
+
+def main(*argv: str) -> None:
+
+    if len(argv) < 1:
+        print('usage: order [filename]')
+        sys.exit(1)
+
+    filename = argv[0]
+
+    print(f'reading contents of {filename}...', end='')
+    text = read_file(filename)
+
+    print('extracting order...', end='')
+    order = get_order(text)
+
+    print('reading blacklist...', end='')
+    blacklist = get_blacklist()
+
+    print('counting ord frequency...')
+    freq = get_ord_frequency(order, blacklist)
+
+    print(f'finding top {TOP_COUNT}...', end='')
+    freq_top = get_freq_top(freq)
+
+    pprint(freq_top)
 
 
 if __name__ == '__main__':
     try:
-        main()
+        main(*sys.argv[1:])
     except KeyboardInterrupt:
         pass
